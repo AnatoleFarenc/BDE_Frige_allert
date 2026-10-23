@@ -119,6 +119,14 @@ async def callback(request: web.Request) -> web.StreamResponse:
         user_id = int((await user_resp.json())["id"])
 
     if not bot.is_allowed(user_id):
+        guild = bot.guild
+        member = guild.get_member(user_id) if guild else None
+        log.warning(
+            "Access denied for user %s: %s", user_id,
+            "bot is not in GUILD_ID" if guild is None
+            else "not a member of the server (or members not cached)" if member is None
+            else f"missing role ALLOWED_ROLE_ID, has roles {[(r.name, r.id) for r in member.roles]}",
+        )
         response = web.FileResponse(STATIC_DIR / "forbidden.html", status=403)
         response.del_cookie(STATE_COOKIE)
         return response
@@ -211,10 +219,13 @@ async def api_set_duty(request: web.Request) -> web.Response:
     bot.store.set(day, user_ids)
     log.info("Duty for %s changed by %s: %s", day, request["user_id"], sorted(user_ids))
 
+    notified = True
     if day == bot.today():
-        await bot.notify_same_day_change(user_ids - previous, previous - user_ids)
+        notified = await bot.notify_same_day_change(user_ids - previous, previous - user_ids)
 
-    return web.json_response({"day": day.isoformat(), "user_ids": [str(u) for u in user_ids]})
+    return web.json_response(
+        {"day": day.isoformat(), "user_ids": [str(u) for u in user_ids], "notified": notified}
+    )
 
 
 # --- Server ------------------------------------------------------------------

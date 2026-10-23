@@ -126,8 +126,9 @@ function updateCount() {
 async function save(userIds) {
   $("save").disabled = true;
   try {
-    await api(`/api/duties/${editing.day}`, { method: "PUT", body: JSON.stringify({ user_ids: userIds }) });
+    const result = await api(`/api/duties/${editing.day}`, { method: "PUT", body: JSON.stringify({ user_ids: userIds }) });
     $("editor").close();
+    if (!result.notified) alert("Saved, but the bot could not post on Discord. Check the server logs.");
     await Promise.all([loadMonth(), loadUpcoming()]);
   } catch (err) {
     alert(`Could not save: ${err.message}`);

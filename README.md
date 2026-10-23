@@ -111,6 +111,10 @@ For local testing, set `BASE_URL=http://localhost:8080` in `.env` and open <http
 
 - **"Access denied" for everyone**: check the logs at startup. If the bot is not in the server
   (`GUILD_ID`) or the role (`ALLOWED_ROLE_ID`) doesn't exist, an error is logged.
+- **"Access denied" for one user**: the logs say why (not in the server, or which roles they have).
+- **Check the configuration**: `python -m fridge.check [YOUR_USER_ID]` (with Docker:
+  `docker compose exec fridge python -m fridge.check [YOUR_USER_ID]`) prints the servers the bot is in,
+  whether the channel and role are found, who has the role and what roles a user has.
 - **`PrivilegedIntentsRequired`**: enable **Server Members Intent** in the Bot tab.
 
 ## Backup

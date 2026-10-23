@@ -53,9 +53,20 @@ class FridgeBot(commands.Bot):
         member = guild.get_member(user_id) if guild else None
         return member is not None and any(r.id == self.config.allowed_role_id for r in member.roles)
 
-    async def _channel(self) -> discord.abc.Messageable:
-        channel = self.get_channel(self.config.channel_id)
-        return channel or await self.fetch_channel(self.config.channel_id)
+    async def _post(self, content: str) -> bool:
+        """Send a message to the reminder channel; log Discord errors instead of raising."""
+        try:
+            channel = self.get_channel(self.config.channel_id) or await self.fetch_channel(
+                self.config.channel_id
+            )
+            await channel.send(content)
+            return True
+        except discord.HTTPException as exc:
+            log.error(
+                "Cannot post in CHANNEL_ID=%s (%s %s): check the ID and that the bot can "
+                "view the channel and send messages there", self.config.channel_id, exc.status, exc.text,
+            )
+            return False
 
     async def _send_reminder(self) -> None:
         user_ids = self.store.get(self.today())
@@ -64,19 +75,20 @@ class FridgeBot(commands.Bot):
         now = datetime.now(self.config.tz).time()
         times = self.config.reminder_times
         index = sum(1 for t in times if t.replace(tzinfo=None) <= now) or 1
-        await (await self._channel()).send(
+        await self._post(
             f"🧊 **Fridge reminder ({index}/{len(times)})** — {mentions(user_ids)} "
             "you're on fridge cleaning duty today!"
         )
 
-    async def notify_same_day_change(self, added: set[int], removed: set[int]) -> None:
-        channel = await self._channel()
+    async def notify_same_day_change(self, added: set[int], removed: set[int]) -> bool:
+        ok = True
         if added:
-            await channel.send(
+            ok &= await self._post(
                 f"🧊 **Schedule update** — {mentions(added)} "
                 "you're on fridge cleaning duty **today**!"
             )
         if removed:
-            await channel.send(
+            ok &= await self._post(
                 f"✅ {mentions(removed)} you're no longer on fridge duty today, you're off the hook!"
             )
+        return ok
