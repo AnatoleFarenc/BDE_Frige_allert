@@ -1,4 +1,6 @@
-const WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+// Dates use the browser locale; 2024-01-01 was a Monday, so weeks start on Monday.
+const WEEKDAYS = Array.from({ length: 7 }, (_, i) =>
+  new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: "short" }));
 const $ = (id) => document.getElementById(id);
 
 let members = new Map();     // id -> {id, name, avatar}
@@ -14,7 +16,7 @@ function iso(d) {
 }
 function fromIso(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
 function longDate(d) {
-  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
 async function api(path, options = {}) {
@@ -23,7 +25,7 @@ async function api(path, options = {}) {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
-  if (res.status === 401) { location.href = "/"; throw new Error("Non connecté"); }
+  if (res.status === 401) { location.href = "/"; throw new Error("Not logged in"); }
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -40,7 +42,7 @@ function el(tag, attrs = {}, ...children) {
 }
 
 function chip(userId) {
-  const m = members.get(userId) || { name: "Membre parti", avatar: "" };
+  const m = members.get(userId) || { name: "Former member", avatar: "" };
   return el("div", { class: "chip", title: m.name },
     el("img", { class: "avatar", src: m.avatar, alt: "" }),
     el("span", {}, m.name));
@@ -59,7 +61,7 @@ async function loadMonth() {
 }
 
 function renderCalendar() {
-  $("month-title").textContent = viewMonth.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  $("month-title").textContent = viewMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const cal = $("calendar");
   cal.replaceChildren(...WEEKDAYS.map((w) => el("div", { class: "weekday" }, w)));
   const { start } = gridRange();
@@ -83,7 +85,7 @@ async function loadUpcoming() {
   const list = $("upcoming");
   const entries = Object.entries(upcoming).slice(0, 8);
   if (!entries.length) {
-    list.replaceChildren(el("li", {}, "Aucune corvée planifiée. Clique sur un jour pour en ajouter."));
+    list.replaceChildren(el("li", {}, "No duty scheduled. Click a day to add one."));
     return;
   }
   list.replaceChildren(...entries.map(([day, ids]) =>
@@ -118,7 +120,7 @@ function renderMemberList() {
 
 function updateCount() {
   const n = editing.selected.size;
-  $("count").textContent = n === 0 ? "Personne" : `${n} sélectionné${n > 1 ? "s" : ""}`;
+  $("count").textContent = n === 0 ? "Nobody" : `${n} selected`;
 }
 
 async function save(userIds) {
@@ -128,7 +130,7 @@ async function save(userIds) {
     $("editor").close();
     await Promise.all([loadMonth(), loadUpcoming()]);
   } catch (err) {
-    alert(`Erreur lors de l'enregistrement : ${err.message}`);
+    alert(`Could not save: ${err.message}`);
   } finally {
     $("save").disabled = false;
   }
@@ -140,7 +142,7 @@ async function init() {
   $("me").replaceChildren(
     el("img", { class: "avatar lg", src: me.avatar, alt: "" }),
     el("span", {}, me.name),
-    el("a", { href: "/logout" }, "Déconnexion"));
+    el("a", { href: "/logout" }, "Log out"));
 
   $("prev").onclick = () => { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1); loadMonth(); };
   $("next").onclick = () => { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1); loadMonth(); };

@@ -12,17 +12,17 @@ from urllib.parse import urlencode
 import aiohttp
 from aiohttp import web
 
-from .bot import FrigoBot
+from .bot import FridgeBot
 
 log = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
-SESSION_COOKIE = "frigo_session"
-STATE_COOKIE = "frigo_oauth_state"
+SESSION_COOKIE = "fridge_session"
+STATE_COOKIE = "fridge_oauth_state"
 SESSION_MAX_AGE = 30 * 24 * 3600
 DISCORD_API = "https://discord.com/api/v10"
 
-BOT_KEY = web.AppKey("bot", FrigoBot)
+BOT_KEY = web.AppKey("bot", FridgeBot)
 
 
 # --- Signed session cookie -------------------------------------------------
@@ -56,7 +56,7 @@ def read_session(secret: bytes, value: str | None) -> int | None:
 def current_user(request: web.Request) -> int | None:
     bot = request.app[BOT_KEY]
     user_id = read_session(bot.config.session_secret, request.cookies.get(SESSION_COOKIE))
-    # Role is re-checked on every request so removing @ADMIN_BDE revokes access immediately.
+    # Role is re-checked on every request so removing the allowed role revokes access immediately.
     if user_id is None or not bot.is_allowed(user_id):
         return None
     return user_id
@@ -66,7 +66,7 @@ def redirect(location: str) -> web.Response:
     return web.Response(status=302, headers={"Location": location})
 
 
-def _cookie_opts(bot: FrigoBot) -> dict:
+def _cookie_opts(bot: FridgeBot) -> dict:
     return {"httponly": True, "samesite": "Lax", "secure": bot.config.base_url.startswith("https")}
 
 
@@ -99,7 +99,7 @@ async def callback(request: web.Request) -> web.StreamResponse:
     state = request.query.get("state")
     expected = request.cookies.get(STATE_COOKIE)
     if not code or not state or not expected or not hmac.compare_digest(state, expected):
-        return web.Response(status=400, text="Connexion invalide, reessaie depuis la page d'accueil.")
+        return web.Response(status=400, text="Invalid login, please try again from the home page.")
 
     async with aiohttp.ClientSession() as http:
         token_resp = await http.post(f"{DISCORD_API}/oauth2/token", data={
@@ -110,8 +110,8 @@ async def callback(request: web.Request) -> web.StreamResponse:
             "redirect_uri": bot.config.redirect_uri,
         })
         if token_resp.status != 200:
-            log.warning("Echec OAuth2: %s %s", token_resp.status, await token_resp.text())
-            return web.Response(status=502, text="Discord a refuse la connexion.")
+            log.warning("OAuth2 failure: %s %s", token_resp.status, await token_resp.text())
+            return web.Response(status=502, text="Discord rejected the login.")
         access_token = (await token_resp.json())["access_token"]
         user_resp = await http.get(
             f"{DISCORD_API}/users/@me", headers={"Authorization": f"Bearer {access_token}"}
@@ -145,17 +145,17 @@ async def api_auth(request: web.Request, handler):
     if not request.path.startswith("/api/"):
         return await handler(request)
     if request.app[BOT_KEY].guild is None:
-        return web.json_response({"error": "Bot pas encore connecte a Discord"}, status=503)
+        return web.json_response({"error": "Bot is not connected to Discord yet"}, status=503)
     user_id = current_user(request)
     if user_id is None:
-        return web.json_response({"error": "Non connecte"}, status=401)
+        return web.json_response({"error": "Not logged in"}, status=401)
     if request.method != "GET":
         # CSRF protection: only accept JSON writes coming from our own origin.
         origin = request.headers.get("Origin")
         if request.content_type != "application/json" or (
             origin and origin != request.app[BOT_KEY].config.base_url
         ):
-            return web.json_response({"error": "Requete refusee"}, status=403)
+            return web.json_response({"error": "Request rejected"}, status=403)
     request["user_id"] = user_id
     return await handler(request)
 
@@ -179,14 +179,14 @@ def _parse_date(value: str | None) -> date:
     try:
         return date.fromisoformat(value or "")
     except ValueError:
-        raise web.HTTPBadRequest(text="Date invalide (format attendu : AAAA-MM-JJ)")
+        raise web.HTTPBadRequest(text="Invalid date (expected format: YYYY-MM-DD)")
 
 
 async def api_get_duties(request: web.Request) -> web.Response:
     start = _parse_date(request.query.get("from"))
     end = _parse_date(request.query.get("to"))
     if end < start or end - start > timedelta(days=62):
-        raise web.HTTPBadRequest(text="Intervalle invalide")
+        raise web.HTTPBadRequest(text="Invalid range")
     duties = request.app[BOT_KEY].store.get_range(start, end)
     return web.json_response(
         {day: [str(uid) for uid in uids] for day, uids in duties.items()}
@@ -200,16 +200,16 @@ async def api_set_duty(request: web.Request) -> web.Response:
         body = await request.json()
         user_ids = {int(uid) for uid in body["user_ids"]}
     except (ValueError, KeyError, TypeError):
-        raise web.HTTPBadRequest(text="Corps de requete invalide")
+        raise web.HTTPBadRequest(text="Invalid request body")
 
     guild = bot.guild
     unknown = [uid for uid in user_ids if guild.get_member(uid) is None]
     if unknown:
-        raise web.HTTPBadRequest(text="Certaines personnes ne sont pas sur le serveur")
+        raise web.HTTPBadRequest(text="Some users are not members of the server")
 
     previous = bot.store.get(day)
     bot.store.set(day, user_ids)
-    log.info("Planning du %s modifie par %s : %s", day, request["user_id"], sorted(user_ids))
+    log.info("Duty for %s changed by %s: %s", day, request["user_id"], sorted(user_ids))
 
     if day == bot.today():
         await bot.notify_same_day_change(user_ids - previous, previous - user_ids)
@@ -219,7 +219,7 @@ async def api_set_duty(request: web.Request) -> web.Response:
 
 # --- Server ------------------------------------------------------------------
 
-async def start_web(bot: FrigoBot) -> None:
+async def start_web(bot: FridgeBot) -> None:
     app = web.Application(middlewares=[api_auth])
     app[BOT_KEY] = bot
     app.add_routes([
@@ -236,4 +236,4 @@ async def start_web(bot: FrigoBot) -> None:
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, bot.config.web_host, bot.config.web_port).start()
-    log.info("Interface web sur http://%s:%s", bot.config.web_host, bot.config.web_port)
+    log.info("Web interface on http://%s:%s", bot.config.web_host, bot.config.web_port)

@@ -14,7 +14,7 @@ def mentions(user_ids) -> str:
     return " ".join(f"<@{uid}>" for uid in sorted(user_ids))
 
 
-class FrigoBot(commands.Bot):
+class FridgeBot(commands.Bot):
     def __init__(self, config: Config, store: DutyStore):
         intents = discord.Intents.default()
         intents.members = True  # needed to list server members and check roles
@@ -31,15 +31,15 @@ class FrigoBot(commands.Bot):
         self.reminder.start()
 
     async def on_ready(self) -> None:
-        log.info("Connecte en tant que %s", self.user)
+        log.info("Logged in as %s", self.user)
         guild = self.guild
         if guild is None:
             log.error(
-                "Le bot n'est pas sur le serveur GUILD_ID=%s. Serveurs visibles : %s",
-                self.config.guild_id, [(g.name, g.id) for g in self.guilds] or "aucun",
+                "The bot is not in the server GUILD_ID=%s. Visible servers: %s",
+                self.config.guild_id, [(g.name, g.id) for g in self.guilds] or "none",
             )
         elif guild.get_role(self.config.allowed_role_id) is None:
-            log.error("Role ALLOWED_ROLE_ID=%s introuvable sur %s", self.config.allowed_role_id, guild.name)
+            log.error("Role ALLOWED_ROLE_ID=%s not found in %s", self.config.allowed_role_id, guild.name)
 
     def today(self) -> date:
         return datetime.now(self.config.tz).date()
@@ -65,18 +65,18 @@ class FrigoBot(commands.Bot):
         times = self.config.reminder_times
         index = sum(1 for t in times if t.replace(tzinfo=None) <= now) or 1
         await (await self._channel()).send(
-            f"🧊 **Rappel frigo ({index}/{len(times)})** — {mentions(user_ids)} "
-            "c'est vous qui nettoyez le frigo aujourd'hui !"
+            f"🧊 **Fridge reminder ({index}/{len(times)})** — {mentions(user_ids)} "
+            "you're on fridge cleaning duty today!"
         )
 
     async def notify_same_day_change(self, added: set[int], removed: set[int]) -> None:
         channel = await self._channel()
         if added:
             await channel.send(
-                f"🧊 **Mise à jour du planning** — {mentions(added)} "
-                "vous êtes de corvée frigo **aujourd'hui** !"
+                f"🧊 **Schedule update** — {mentions(added)} "
+                "you're on fridge cleaning duty **today**!"
             )
         if removed:
             await channel.send(
-                f"✅ {mentions(removed)} tu n'es plus de corvée frigo aujourd'hui, tu es libéré(e) !"
+                f"✅ {mentions(removed)} you're no longer on fridge duty today, you're off the hook!"
             )

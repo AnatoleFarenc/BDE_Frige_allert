@@ -1,72 +1,88 @@
-# 🧊 Planning Frigo — BDE 42 Perpignan
+# 🧊 Fridge Duty
 
-Bot Discord + interface web (`https://frigo.bde42perpignan.fr`) pour organiser le nettoyage du frigo.
+A Discord bot with a web calendar to organize who cleans the shared fridge — built for student
+unions (BDE) but usable by any Discord community.
 
-- **Calendrier web** : on clique sur un jour, on coche les membres du serveur, on enregistre.
-- **Accès réservé** : connexion via Discord, seuls les membres ayant le rôle ADMIN_BDE peuvent entrer.
-  Le rôle est revérifié à chaque requête : retirer le rôle coupe l'accès immédiatement.
-- **Rappels** : le jour J, le bot ping les personnes de corvée 3 fois (9h, 12h, 16h par défaut).
-- **Changement le jour même** : les personnes ajoutées sont pingées tout de suite, celles qui
-  sont retirées sont prévenues qu'elles sont libérées.
+- **Web calendar**: click a day, tick the server members on duty, save.
+- **Restricted access**: sign in with Discord; only members with a given role can get in.
+  The role is re-checked on every request, so removing it revokes access immediately.
+- **Reminders**: on the day, the bot pings the people on duty 3 times (9:00, 12:00, 16:00 by default).
+- **Same-day changes**: people added are pinged right away, people removed are told they're free.
 
-Un seul processus Python fait tourner le bot et le site ; les données sont dans `data/frigo.db` (SQLite).
+A single Python process runs both the bot and the website; data is stored in `data/fridge.db` (SQLite).
 
-## 1. Créer l'application Discord
+## 1. Create the Discord application
 
 1. <https://discord.com/developers/applications> → **New Application**.
-2. Onglet **Bot** :
-   - **Reset Token** → copier dans `DISCORD_TOKEN`.
-   - Activer **Server Members Intent** (obligatoire pour lister les membres et vérifier les rôles).
-3. Onglet **OAuth2** :
-   - Copier **Client ID** → `DISCORD_CLIENT_ID` et **Client Secret** → `DISCORD_CLIENT_SECRET`.
-   - **Redirects** : ajouter `https://frigo.bde42perpignan.fr/callback`.
-4. Inviter le bot : OAuth2 → URL Generator → scope `bot`, permissions *View Channels* + *Send Messages*.
-   Ouvrir l'URL et choisir le serveur du BDE.
+2. **Bot** tab:
+   - **Reset Token** → copy it into `DISCORD_TOKEN`.
+   - Enable **Server Members Intent** (required to list members and check roles).
+3. **OAuth2** tab:
+   - Copy **Client ID** → `DISCORD_CLIENT_ID` and **Client Secret** → `DISCORD_CLIENT_SECRET`.
+   - **Redirects**: add `https://<your-domain>/callback` (and `http://localhost:8080/callback` for local testing).
+4. Invite the bot to your server (replace `CLIENT_ID`):
+   `https://discord.com/oauth2/authorize?client_id=CLIENT_ID&scope=bot&permissions=3072`
+   (permissions: *View Channels* + *Send Messages*). Make sure it can see the reminder channel.
 
-Récupérer les IDs (Discord → Paramètres → Avancés → **Mode développeur**, puis clic droit → *Copier l'identifiant*) :
-`GUILD_ID` (le serveur), `CHANNEL_ID` (le salon des rappels), `ALLOWED_ROLE_ID` (le rôle ADMIN_BDE).
+Get the IDs (Discord → Settings → Advanced → **Developer Mode**, then right-click → *Copy ID*):
+`GUILD_ID` (the server), `CHANNEL_ID` (the reminder channel), `ALLOWED_ROLE_ID` (the role allowed on the website).
 
 ## 2. DNS
 
-Chez le registrar de `bde42perpignan.fr`, ajouter un enregistrement :
+At your domain registrar, add a record pointing a subdomain to your server:
 
-| Type | Nom    | Valeur                  |
-|------|--------|-------------------------|
-| A    | frigo  | IP publique du serveur  |
+| Type | Name   | Value                    |
+|------|--------|--------------------------|
+| A    | fridge | Public IP of your server |
 
-## 3. Lancer sur le serveur
+## 3. Run on the server
+
+Requires Docker Engine with the Compose plugin.
 
 ```bash
 cp .env.example .env
 python3 -c "import secrets; print(secrets.token_hex(32))"   # → SESSION_SECRET
-nano .env                                                    # remplir les valeurs
+nano .env                                                    # fill in the values (DOMAIN, BASE_URL, IDs…)
 docker compose up -d --build
-docker compose logs -f frigo
+docker compose logs -f fridge
 ```
 
-Caddy obtient automatiquement le certificat HTTPS dès que le DNS pointe vers le serveur
-(ports 80 et 443 ouverts).
+Caddy gets an HTTPS certificate automatically once the DNS points to the server (ports 80 and 443 open).
 
-**Le serveur a déjà un nginx / reverse proxy ?** Supprimer le service `caddy` de
-`docker-compose.yml`, exposer le port (`ports: ["127.0.0.1:8080:8080"]` sur le service `frigo`)
-et ajouter un vhost qui fait `proxy_pass http://127.0.0.1:8080;` pour `frigo.bde42perpignan.fr`.
+**Already running nginx or another reverse proxy?** Remove the `caddy` service from
+`docker-compose.yml`, publish the port on the `fridge` service (`ports: ["127.0.0.1:8080:8080"]`)
+and add a virtual host for your domain with `proxy_pass http://127.0.0.1:8080;`.
 
-### Sans Docker
+### Without Docker / local testing
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m frigo
+.venv/bin/python -m fridge
 ```
+
+For local testing, set `BASE_URL=http://localhost:8080` in `.env` and open <http://localhost:8080>.
 
 ## Configuration
 
-| Variable          | Défaut              | Rôle                                  |
-|-------------------|---------------------|---------------------------------------|
-| `REMINDER_TIMES`  | `09:00,12:00,16:00` | Heures des rappels                    |
-| `TIMEZONE`        | `Europe/Paris`      | Fuseau horaire des rappels            |
-| `WEB_PORT`        | `8080`              | Port interne du site                  |
-| `DB_PATH`         | `data/frigo.db`     | Fichier SQLite                        |
+| Variable          | Default             | Description                          |
+|-------------------|---------------------|--------------------------------------|
+| `DOMAIN`          | —                   | Domain served by Caddy (Docker only) |
+| `BASE_URL`        | —                   | Public URL of the website            |
+| `REMINDER_TIMES`  | `09:00,12:00,16:00` | Reminder times                       |
+| `TIMEZONE`        | `UTC`               | Timezone for reminders               |
+| `WEB_PORT`        | `8080`              | Internal web port                    |
+| `DB_PATH`         | `data/fridge.db`    | SQLite file                          |
 
-## Sauvegarde
+## Troubleshooting
 
-Tout le planning est dans `data/frigo.db` : il suffit de copier ce fichier.
+- **"Access denied" for everyone**: check the logs at startup. If the bot is not in the server
+  (`GUILD_ID`) or the role (`ALLOWED_ROLE_ID`) doesn't exist, an error is logged.
+- **`PrivilegedIntentsRequired`**: enable **Server Members Intent** in the Bot tab.
+
+## Backup
+
+The whole schedule lives in `data/fridge.db`: just copy that file.
+
+## License
+
+[MIT](LICENSE)

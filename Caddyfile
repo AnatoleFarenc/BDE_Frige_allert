@@ -1,3 +1,3 @@
-frigo.bde42perpignan.fr {
-	reverse_proxy frigo:8080
+{$DOMAIN} {
+	reverse_proxy fridge:8080
 }

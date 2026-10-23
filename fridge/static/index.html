@@ -1,27 +1,27 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Planning Frigo</title>
+  <title>Fridge Duty</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header>
-    <h1>🧊 Planning Frigo</h1>
+    <h1>🧊 Fridge Duty</h1>
     <div class="me" id="me"></div>
   </header>
 
   <main>
     <div class="month-nav">
-      <button id="prev" aria-label="Mois précédent">←</button>
+      <button id="prev" aria-label="Previous month">←</button>
       <h2 id="month-title"></h2>
-      <button id="next" aria-label="Mois suivant">→</button>
+      <button id="next" aria-label="Next month">→</button>
     </div>
     <div class="calendar" id="calendar"></div>
 
     <section class="upcoming">
-      <h3>Prochaines corvées</h3>
+      <h3>Upcoming duties</h3>
       <ul id="upcoming"></ul>
     </section>
   </main>
@@ -30,16 +30,16 @@
     <form method="dialog" class="dialog-body" id="editor-form">
       <h3 id="editor-title"></h3>
       <div class="notice" id="editor-notice" hidden>
-        C'est aujourd'hui : les personnes ajoutées ou retirées seront pingées immédiatement sur Discord.
+        This is today: added or removed people will be pinged on Discord right away.
       </div>
-      <input class="search" id="search" type="search" placeholder="Rechercher un membre…" autocomplete="off">
+      <input class="search" id="search" type="search" placeholder="Search members…" autocomplete="off">
       <div class="member-list" id="member-list"></div>
       <div class="dialog-actions">
         <span class="count" id="count"></span>
         <div class="right">
-          <button type="button" class="danger" id="clear">Vider</button>
-          <button type="button" id="cancel">Annuler</button>
-          <button type="submit" class="primary" id="save">Enregistrer</button>
+          <button type="button" class="danger" id="clear">Clear</button>
+          <button type="button" id="cancel">Cancel</button>
+          <button type="submit" class="primary" id="save">Save</button>
         </div>
       </div>
     </form>
