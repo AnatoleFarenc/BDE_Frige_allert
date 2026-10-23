@@ -42,16 +42,50 @@ Requires Docker Engine with the Compose plugin.
 ```bash
 cp .env.example .env
 python3 -c "import secrets; print(secrets.token_hex(32))"   # → SESSION_SECRET
-nano .env                                                    # fill in the values (DOMAIN, BASE_URL, IDs…)
-docker compose up -d --build
-docker compose logs -f fridge
+nano .env                                                    # fill in the values (BASE_URL, IDs…)
+```
+
+The bot listens on `127.0.0.1:8080` and needs a reverse proxy in front of it for HTTPS.
+Pick the option matching your server:
+
+**A. The server has no web server yet** — use the bundled Caddy (set `DOMAIN` in `.env`):
+
+```bash
+docker compose --profile caddy up -d --build
 ```
 
 Caddy gets an HTTPS certificate automatically once the DNS points to the server (ports 80 and 443 open).
 
-**Already running nginx or another reverse proxy?** Remove the `caddy` service from
-`docker-compose.yml`, publish the port on the `fridge` service (`ports: ["127.0.0.1:8080:8080"]`)
-and add a virtual host for your domain with `proxy_pass http://127.0.0.1:8080;`.
+**B. Caddy is already installed on the server** — add this to `/etc/caddy/Caddyfile`:
+
+```
+fridge.example.com {
+	reverse_proxy 127.0.0.1:8080
+}
+```
+
+```bash
+sudo systemctl reload caddy
+docker compose up -d --build
+```
+
+**C. nginx is already installed** — add a virtual host, then get a certificate with
+`sudo certbot --nginx -d fridge.example.com`:
+
+```nginx
+server {
+    listen 80;
+    server_name fridge.example.com;
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Check the logs with `docker compose logs -f fridge`.
 
 ### Without Docker / local testing
 
@@ -64,14 +98,14 @@ For local testing, set `BASE_URL=http://localhost:8080` in `.env` and open <http
 
 ## Configuration
 
-| Variable          | Default             | Description                          |
-|-------------------|---------------------|--------------------------------------|
-| `DOMAIN`          | —                   | Domain served by Caddy (Docker only) |
-| `BASE_URL`        | —                   | Public URL of the website            |
-| `REMINDER_TIMES`  | `09:00,12:00,16:00` | Reminder times                       |
-| `TIMEZONE`        | `UTC`               | Timezone for reminders               |
-| `WEB_PORT`        | `8080`              | Internal web port                    |
-| `DB_PATH`         | `data/fridge.db`    | SQLite file                          |
+| Variable          | Default             | Description                             |
+|-------------------|---------------------|-----------------------------------------|
+| `DOMAIN`          | —                   | Domain for the bundled Caddy (option A) |
+| `BASE_URL`        | —                   | Public URL of the website               |
+| `REMINDER_TIMES`  | `09:00,12:00,16:00` | Reminder times                          |
+| `TIMEZONE`        | `UTC`               | Timezone for reminders                  |
+| `WEB_PORT`        | `8080`              | Internal web port                       |
+| `DB_PATH`         | `data/fridge.db`    | SQLite file                             |
 
 ## Troubleshooting
 
