@@ -1,0 +1,3 @@
+frigo.bde42perpignan.fr {
+	reverse_proxy frigo:8080
+}

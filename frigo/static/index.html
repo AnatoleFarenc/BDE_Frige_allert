@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Planning Frigo</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>🧊 Planning Frigo</h1>
+    <div class="me" id="me"></div>
+  </header>
+
+  <main>
+    <div class="month-nav">
+      <button id="prev" aria-label="Mois précédent">←</button>
+      <h2 id="month-title"></h2>
+      <button id="next" aria-label="Mois suivant">→</button>
+    </div>
+    <div class="calendar" id="calendar"></div>
+
+    <section class="upcoming">
+      <h3>Prochaines corvées</h3>
+      <ul id="upcoming"></ul>
+    </section>
+  </main>
+
+  <dialog id="editor">
+    <form method="dialog" class="dialog-body" id="editor-form">
+      <h3 id="editor-title"></h3>
+      <div class="notice" id="editor-notice" hidden>
+        C'est aujourd'hui : les personnes ajoutées ou retirées seront pingées immédiatement sur Discord.
+      </div>
+      <input class="search" id="search" type="search" placeholder="Rechercher un membre…" autocomplete="off">
+      <div class="member-list" id="member-list"></div>
+      <div class="dialog-actions">
+        <span class="count" id="count"></span>
+        <div class="right">
+          <button type="button" class="danger" id="clear">Vider</button>
+          <button type="button" id="cancel">Annuler</button>
+          <button type="submit" class="primary" id="save">Enregistrer</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
